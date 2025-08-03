@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const Database = require('../database/init');
+//const Database = require('../database/init');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
