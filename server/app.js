@@ -56,9 +56,9 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   
   // Initialize database
-  //const Database = require('./database/init');
-  //const db = new Database();
-  //db.connect().catch(console.error);
+  const Database = require('./database/init');
+  const db = new Database();
+  db.connect().catch(console.error);
 });
 
 module.exports = app;
