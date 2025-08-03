@@ -1,6 +1,6 @@
 const express = require('express');
 const axios = require('axios');
-const Database = require('../database/init');
+//const Database = require('../database/init');
 const { authenticateAdmin } = require('../middleware/auth');
 
 const router = express.Router();
