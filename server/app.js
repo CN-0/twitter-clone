@@ -4,12 +4,6 @@
 // const rateLimit = require('express-rate-limit');
 // const path = require('path');
 
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import path from 'path';
-
 // Import routes
 const authRoutes = require('./routes/auth');
 const tweetRoutes = require('./routes/tweets');
