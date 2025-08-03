@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const Database = require('../database/init');
+//const Database = require('../database/init');
 const { generateTokens, JWT_REFRESH_SECRET } = require('../middleware/auth');
 
 const router = express.Router();
