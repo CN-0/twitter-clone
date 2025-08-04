@@ -1,14 +1,18 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const path = require('path');
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Import routes
-const authRoutes = require('./routes/auth');
-const tweetRoutes = require('./routes/tweets');
-const userRoutes = require('./routes/users');
-const adminRoutes = require('./routes/admin');
+import authRoutes from './routes/auth.js';
+import tweetRoutes from './routes/tweets.js';
+import userRoutes from './routes/users.js';
+import adminRoutes from './routes/admin.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -56,9 +60,10 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   
   // Initialize database
-  const Database = require('./database/init');
-  const db = new Database();
-  db.connect().catch(console.error);
+  import('./database/init.js').then(({ default: Database }) => {
+    const db = new Database();
+    db.connect().catch(console.error);
+  });
 });
 
-module.exports = app;
+export default app;

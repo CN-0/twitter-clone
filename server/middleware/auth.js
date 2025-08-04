@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const Database = require('../database/init');
+import jwt from 'jsonwebtoken';
+import Database from '../database/init.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
@@ -64,7 +64,7 @@ const generateTokens = (userId) => {
   return { accessToken, refreshToken };
 };
 
-module.exports = {
+export {
   authenticateToken,
   authenticateAdmin,
   generateTokens,

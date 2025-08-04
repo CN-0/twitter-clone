@@ -1,6 +1,11 @@
-const sqlite3 = require('sqlite3').verbose();
-const fs = require('fs');
-const path = require('path');
+import sqlite3 from 'sqlite3';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class Database {
   constructor() {
@@ -45,7 +50,6 @@ class Database {
   async createDefaultAdmin() {
     return new Promise((resolve, reject) => {
       // Create a default admin user for testing
-      const bcrypt = require('bcryptjs');
       const hashedPassword = bcrypt.hashSync('admin123', 10);
       
       const insertUser = `
@@ -101,4 +105,4 @@ class Database {
   }
 }
 
-module.exports = Database;
+export default Database;

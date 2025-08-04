@@ -1,6 +1,6 @@
-const express = require('express');
-const Database = require('../database/init');
-const { authenticateToken } = require('../middleware/auth');
+import express from 'express';
+import Database from '../database/init.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -333,4 +333,4 @@ router.get('/user/:username', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

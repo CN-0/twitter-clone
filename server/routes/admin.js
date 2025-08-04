@@ -1,7 +1,7 @@
-const express = require('express');
-const axios = require('axios');
-const Database = require('../database/init');
-const { authenticateAdmin } = require('../middleware/auth');
+import express from 'express';
+import axios from 'axios';
+import Database from '../database/init.js';
+import { authenticateAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -230,4 +230,4 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
