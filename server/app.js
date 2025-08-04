@@ -4,18 +4,29 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import Database from './database/init.js';
 
-// Import routes
-import authRoutes from './routes/auth.js';
-import tweetRoutes from './routes/tweets.js';
-import userRoutes from './routes/users.js';
-import adminRoutes from './routes/admin.js';
+// Import route factories
+import createAuthRoutes from './routes/auth.js';
+import createTweetRoutes from './routes/tweets.js';
+import createUserRoutes from './routes/users.js';
+import createAdminRoutes from './routes/admin.js';
+
+// Import middleware factories
+import { createAuthMiddleware } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Initialize database connection
+const db = new Database();
+await db.connect();
+
+// Create middleware with shared database
+const { authenticateToken, authenticateAdmin } = createAuthMiddleware(db);
 
 // Security middleware
 app.use(helmet());
@@ -38,11 +49,11 @@ app.use(express.urlencoded({ extended: true }));
 // Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/tweets', tweetRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/admin', adminRoutes);
+// Routes with shared database
+app.use('/api/auth', createAuthRoutes(db));
+app.use('/api/tweets', createTweetRoutes(db, authenticateToken));
+app.use('/api/users', createUserRoutes(db, authenticateToken));
+app.use('/api/admin', createAdminRoutes(db, authenticateAdmin));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -58,12 +69,6 @@ app.use((err, req, res, next) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  
-  // Initialize database
-  import('./database/init.js').then(({ default: Database }) => {
-    const db = new Database();
-    db.connect().catch(console.error);
-  });
 });
 
 export default app;
