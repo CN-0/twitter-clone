@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import session from 'express-session';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Database from './database/init.js';
@@ -33,6 +34,14 @@ app.use(helmet());
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:3000'],
   credentials: true
+}));
+
+// Session middleware for OAuth
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-session-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // Set to true in production with HTTPS
 }));
 
 // Rate limiting

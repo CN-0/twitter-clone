@@ -175,6 +175,24 @@ class ApiService {
     const response = await this.request('/admin/stats');
     return response.json();
   }
+
+  // Twitter authentication methods
+  async getTwitterAuthUrl(userId: number) {
+    const response = await this.request(`/auth/twitter?userId=${userId}`);
+    return response.json();
+  }
+
+  async getTwitterStatus() {
+    const response = await this.request('/admin/twitter-status');
+    return response.json();
+  }
+
+  async bulkScrapeTargets() {
+    const response = await this.request('/admin/scrape-all', {
+      method: 'POST'
+    });
+    return response.json();
+  }
 }
 
 export const apiService = new ApiService();

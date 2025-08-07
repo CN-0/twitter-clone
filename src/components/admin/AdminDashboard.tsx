@@ -7,9 +7,13 @@ import {
   Plus,
   Play,
   Square,
-  Trash2
+  Trash2,
+  Twitter,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { apiService } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ScrapingTarget {
   id: number;
@@ -27,15 +31,39 @@ interface AdminStats {
   activeTargetsCount: number;
 }
 
+interface TwitterStatus {
+  authenticated: boolean;
+  username: string | null;
+}
+
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [targets, setTargets] = useState<ScrapingTarget[]>([]);
+  const [twitterStatus, setTwitterStatus] = useState<TwitterStatus | null>(null);
   const [newUsername, setNewUsername] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchData();
+    checkTwitterAuth();
+  }, []);
+
+  useEffect(() => {
+    // Check for Twitter auth callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const twitterAuth = urlParams.get('twitter_auth');
+    
+    if (twitterAuth === 'success') {
+      checkTwitterAuth();
+      // Remove the query parameter
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (twitterAuth === 'error') {
+      console.error('Twitter authentication failed');
+      // Remove the query parameter
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
   const fetchData = async () => {
@@ -54,6 +82,32 @@ const AdminDashboard: React.FC = () => {
       setTargets([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkTwitterAuth = async () => {
+    try {
+      const status = await apiService.getTwitterStatus();
+      setTwitterStatus(status);
+    } catch (error) {
+      console.error('Error checking Twitter status:', error);
+      setTwitterStatus({ authenticated: false, username: null });
+    }
+  };
+
+  const handleTwitterAuth = async () => {
+    try {
+      if (!user?.id) return;
+      
+      setActionLoading('twitter-auth');
+      const authData = await apiService.getTwitterAuthUrl(user.id);
+      
+      // Open Twitter auth in a new window
+      window.open(authData.authUrl, '_blank', 'width=600,height=600');
+    } catch (error) {
+      console.error('Error initiating Twitter auth:', error);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -86,12 +140,39 @@ const AdminDashboard: React.FC = () => {
   };
 
   const manualScrape = async (id: number) => {
+    if (!twitterStatus?.authenticated) {
+      alert('Please authenticate with Twitter first to enable scraping.');
+      return;
+    }
+
     try {
       setActionLoading(`scrape-${id}`);
       await apiService.manualScrape(id);
       fetchData();
     } catch (error) {
       console.error('Error scraping:', error);
+      alert(`Scraping failed: ${error.message || 'Unknown error'}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const bulkScrape = async () => {
+    if (!twitterStatus?.authenticated) {
+      alert('Please authenticate with Twitter first to enable scraping.');
+      return;
+    }
+
+    try {
+      setActionLoading('bulk-scrape');
+      const result = await apiService.bulkScrapeTargets();
+      
+      alert(`Bulk scraping completed!\nTargets: ${result.summary.totalTargets}\nSuccessful: ${result.summary.successful}\nTotal tweets scraped: ${result.summary.totalTweetsScraped}`);
+      
+      fetchData();
+    } catch (error) {
+      console.error('Error bulk scraping:', error);
+      alert(`Bulk scraping failed: ${error.message || 'Unknown error'}`);
     } finally {
       setActionLoading(null);
     }
@@ -119,6 +200,52 @@ const AdminDashboard: React.FC = () => {
         <p className="text-gray-600 dark:text-gray-400">
           Manage tweet scraping and monitor platform statistics
         </p>
+      </div>
+
+      {/* Twitter Authentication Status */}
+      <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Twitter className="h-6 w-6 text-blue-500" />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Twitter API Authentication
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {twitterStatus?.authenticated 
+                  ? `Connected as @${twitterStatus.username}` 
+                  : 'Connect your Twitter account to enable tweet scraping'
+                }
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
+            {twitterStatus?.authenticated ? (
+              <div className="flex items-center space-x-2">
+                <span className="inline-flex px-3 py-1 text-sm font-medium rounded-full bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400">
+                  Connected
+                </span>
+                <button
+                  onClick={bulkScrape}
+                  disabled={actionLoading === 'bulk-scrape'}
+                  className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span>{actionLoading === 'bulk-scrape' ? 'Scraping...' : 'Scrape All'}</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleTwitterAuth}
+                disabled={actionLoading === 'twitter-auth'}
+                className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span>{actionLoading === 'twitter-auth' ? 'Connecting...' : 'Connect Twitter'}</span>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -272,8 +399,9 @@ const AdminDashboard: React.FC = () => {
                       
                       <button
                         onClick={() => manualScrape(target.id)}
-                        disabled={!target.is_active || actionLoading === `scrape-${target.id}`}
+                        disabled={!target.is_active || !twitterStatus?.authenticated || actionLoading === `scrape-${target.id}`}
                         className="bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/40 disabled:opacity-50 disabled:cursor-not-allowed p-2 rounded-lg transition-colors duration-200"
+                        title={!twitterStatus?.authenticated ? 'Twitter authentication required' : 'Scrape tweets'}
                       >
                         <Download className="h-4 w-4" />
                       </button>
@@ -304,16 +432,18 @@ const AdminDashboard: React.FC = () => {
           Tweet Scraping Guide
         </h3>
         <ul className="space-y-2 text-blue-800 dark:text-blue-200">
+          <li>• First, authenticate with Twitter using the "Connect Twitter" button above</li>
           <li>• Add Twitter usernames (without @) to start monitoring their public tweets</li>
           <li>• Use the toggle button to activate/deactivate scraping for specific users</li>
           <li>• Click the download button to manually trigger scraping for active targets</li>
+          <li>• Use "Scrape All" to scrape tweets from all active targets at once</li>
           <li>• Scraped tweets are automatically integrated into the platform timeline</li>
           <li>• Monitor the statistics above to track scraping performance</li>
         </ul>
         
         <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            <strong>Note:</strong> This demo uses mock data for scraping. In production, implement proper Twitter API integration with appropriate rate limiting and terms of service compliance.
+            <strong>Note:</strong> This system uses the Twitter API v2 for scraping. Make sure you have proper API credentials configured and comply with Twitter's rate limits and terms of service.
           </p>
         </div>
       </div>

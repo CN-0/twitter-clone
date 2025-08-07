@@ -2,10 +2,86 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { generateTokens, JWT_REFRESH_SECRET } from '../middleware/auth.js';
+import { createOAuthClient } from '../config/twitter.js';
+import TwitterScraperService from '../services/twitterScraper.js';
 
 const createAuthRoutes = (db) => {
   const router = express.Router();
   const database = db.getDb();
+  const twitterScraper = new TwitterScraperService(db);
+
+  // Twitter OAuth routes
+  router.get('/twitter', async (req, res) => {
+    try {
+      const { userId } = req.query;
+      
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID required' });
+      }
+
+      const oauthClient = createOAuthClient();
+      const authLink = await oauthClient.generateAuthLink('http://localhost:3001/api/auth/twitter/callback', {
+        linkMode: 'authorize'
+      });
+
+      // Store the oauth token and secret temporarily (you might want to use Redis in production)
+      req.session = req.session || {};
+      req.session.oauth_token = authLink.oauth_token;
+      req.session.oauth_token_secret = authLink.oauth_token_secret;
+      req.session.user_id = userId;
+
+      res.json({ authUrl: authLink.url });
+    } catch (error) {
+      console.error('Twitter OAuth error:', error);
+      res.status(500).json({ error: 'Failed to generate Twitter auth link' });
+    }
+  });
+
+  router.get('/twitter/callback', async (req, res) => {
+    try {
+      const { oauth_token, oauth_verifier } = req.query;
+      
+      if (!oauth_token || !oauth_verifier) {
+        return res.status(400).json({ error: 'Missing OAuth parameters' });
+      }
+
+      // Get stored OAuth tokens from session
+      const storedToken = req.session?.oauth_token;
+      const storedSecret = req.session?.oauth_token_secret;
+      const userId = req.session?.user_id;
+
+      if (!storedToken || !storedSecret || !userId) {
+        return res.status(400).json({ error: 'Invalid OAuth session' });
+      }
+
+      const oauthClient = createOAuthClient();
+      const loginResult = await oauthClient.login({
+        oauth_token: storedToken,
+        oauth_token_secret: storedSecret,
+        oauth_verifier
+      });
+
+      // Store the user's Twitter tokens
+      await twitterScraper.storeUserTwitterTokens(
+        userId,
+        loginResult.accessToken,
+        loginResult.accessSecret,
+        loginResult.userId,
+        loginResult.screenName
+      );
+
+      // Clear session
+      delete req.session.oauth_token;
+      delete req.session.oauth_token_secret;
+      delete req.session.user_id;
+
+      // Redirect to admin dashboard
+      res.redirect('http://localhost:5173/admin?twitter_auth=success');
+    } catch (error) {
+      console.error('Twitter callback error:', error);
+      res.redirect('http://localhost:5173/admin?twitter_auth=error');
+    }
+  });
 
   // Register
   router.post('/register', async (req, res) => {

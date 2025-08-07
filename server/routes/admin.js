@@ -1,9 +1,24 @@
 import express from 'express';
-import axios from 'axios';
+import TwitterScraperService from '../services/twitterScraper.js';
 
 const createAdminRoutes = (db, authenticateAdmin) => {
   const router = express.Router();
   const database = db.getDb();
+  const twitterScraper = new TwitterScraperService(db);
+
+  // Check Twitter authentication status
+  router.get('/twitter-status', authenticateAdmin, async (req, res) => {
+    try {
+      const tokens = await twitterScraper.getUserTwitterTokens(req.user.id);
+      res.json({ 
+        authenticated: !!tokens,
+        username: tokens?.twitter_username || null
+      });
+    } catch (error) {
+      console.error('Error checking Twitter status:', error);
+      res.status(500).json({ error: 'Failed to check Twitter status' });
+    }
+  });
 
   // Get scraping targets
   router.get('/scraping-targets', authenticateAdmin, async (req, res) => {
@@ -99,37 +114,16 @@ const createAdminRoutes = (db, authenticateAdmin) => {
           }
 
           try {
-            const scrapedTweets = await scrapeTweetsFromUser(target.username);
-            
-            // Store scraped tweets
-            let tweetsAdded = 0;
-            for (const tweet of scrapedTweets) {
-              database.run(
-                `INSERT INTO tweets (user_id, content, is_scraped, scraped_from, created_at) 
-                 VALUES (?, ?, ?, ?, ?)`,
-                [1, tweet.content, true, target.username, tweet.createdAt],
-                function(err) {
-                  if (!err) {
-                    tweetsAdded++;
-                  }
-                }
-              );
-            }
-
-            // Update scraping target
-            database.run(
-              'UPDATE scraping_targets SET last_scraped_at = CURRENT_TIMESTAMP, tweets_scraped = tweets_scraped + ? WHERE id = ?',
-              [tweetsAdded, id]
-            );
+            const result = await twitterScraper.scrapeTweetsFromUser(target.username, req.user.id);
 
             res.json({
               message: 'Scraping completed',
-              tweetsAdded,
-              username: target.username
+              tweetsAdded: result.scrapedCount,
+              username: result.username
             });
           } catch (scrapeError) {
             console.error('Scraping error:', scrapeError);
-            res.status(500).json({ error: 'Failed to scrape tweets' });
+            res.status(500).json({ error: scrapeError.message || 'Failed to scrape tweets' });
           }
         }
       );
@@ -139,32 +133,28 @@ const createAdminRoutes = (db, authenticateAdmin) => {
     }
   });
 
-  // Mock scraping function (replace with actual implementation)
-  async function scrapeTweetsFromUser(username) {
-    // This is a mock implementation
-    // In a real application, you would implement actual scraping logic
-    // Note: Be careful with rate limits and Twitter's Terms of Service
-    
-    const mockTweets = [
-      {
-        content: `Sample tweet from @${username} - This is a mock scraped tweet for demonstration purposes.`,
-        createdAt: new Date().toISOString()
-      },
-      {
-        content: `Another sample tweet from @${username} with some interesting content about technology.`,
-        createdAt: new Date(Date.now() - 3600000).toISOString()
-      },
-      {
-        content: `Mock tweet #3 from @${username} showing the scraping functionality in action.`,
-        createdAt: new Date(Date.now() - 7200000).toISOString()
-      }
-    ];
+  // Bulk scrape all active targets
+  router.post('/scrape-all', authenticateAdmin, async (req, res) => {
+    try {
+      const results = await twitterScraper.scrapeAllActiveTargets(req.user.id);
+      
+      const summary = {
+        totalTargets: results.length,
+        successful: results.filter(r => r.success).length,
+        failed: results.filter(r => !r.success).length,
+        totalTweetsScraped: results.reduce((sum, r) => sum + (r.scrapedCount || 0), 0),
+        results
+      };
 
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    return mockTweets;
-  }
+      res.json({
+        message: 'Bulk scraping completed',
+        summary
+      });
+    } catch (error) {
+      console.error('Bulk scrape error:', error);
+      res.status(500).json({ error: 'Failed to perform bulk scraping' });
+    }
+  });
 
   // Get admin stats
   router.get('/stats', authenticateAdmin, async (req, res) => {
