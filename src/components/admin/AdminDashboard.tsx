@@ -47,9 +47,11 @@ const AdminDashboard: React.FC = () => {
       ]);
       
       setStats(statsData.stats);
-      setTargets(targetsData.targets);
+      setTargets(targetsData.targets || []);
     } catch (error) {
       console.error('Error fetching admin data:', error);
+      setStats(null);
+      setTargets([]);
     } finally {
       setLoading(false);
     }
